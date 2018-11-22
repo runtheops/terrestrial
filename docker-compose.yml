@@ -1,0 +1,40 @@
+version: "3"
+
+services:
+  redis:
+    image: redis:4-alpine
+    networks:
+      - terrestrial
+
+  api:
+      build: .
+      command: api
+      environment:
+        - API_TOKEN=dev
+        - CELERY_BROKER_URL=redis://redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      networks:
+        - terrestrial
+      ports:
+        - 8000:8000
+      depends_on:
+        - redis
+      healthcheck:
+        test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health"]
+        interval: 5s
+        timeout: 1s
+        retries: 12
+
+  worker:
+      build: .
+      command: worker
+      environment:
+        - CELERY_BROKER_URL=redis://redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      networks:
+        - terrestrial
+      depends_on:
+        - redis
+
+networks:
+  terrestrial:
