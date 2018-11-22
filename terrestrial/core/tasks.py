@@ -101,8 +101,11 @@ def list_tasks(state=None):
             f'state must be in {allowed_states}')
 
     def parse_tasks(tasks, parsed):
-        w_tasks = []
+        if not tasks:
+            raise ValueError(
+                'no workers connected?')
 
+        w_tasks = []
         if isinstance(tasks, list):
             for t in tasks:
                 parse_tasks(t)
