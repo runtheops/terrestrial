@@ -50,40 +50,21 @@ def init(*args, **kwargs):
 
 
 @app.task(base=QueueOnce, bind=True)
-def apply(self, config, var={}):
+def terraform(self, config, action, var={}, workspace='default'):
     """
-    Performs 'terraform apply' on a configuration
-    given corresponding variables as <var>
+    Performs arbitrary terraform action on configuration
+    in <workspace> given corresponding variables as <var>
     """
 
-    task_logger.debug(f'Spawning Terraform apply process for {config}')
+    task_logger.debug(f'Spawning Terraform {action} process for {config}')
 
     with TerraformWorker(
-        config_path=f'{app.conf.TF_CONF_PATH}/{config}', 
-        workspace='default', logger=task_logger) as w:
+        config_path=f'{app.conf.TF_CONF_PATH}/{config}',
+        workspace=workspace, logger=task_logger) as w:
 
         try:
-            rc, stdout, stderr = w.apply(var=var)
-            return rc, stdout, stderr
-        except TerrestrialRetryError as exc:
-            raise self.retry(exc=exc, countdown=5)
-
-
-@app.task(base=QueueOnce, bind=True)
-def destroy(self, config, var={}):
-    """
-    Performs "terraform destroy" on a configuration
-    given corresponding variables as <var>
-    """
-
-    task_logger.debug(f'Spawning Terraform destroy process for {config}')
-
-    with TerraformWorker(
-        config_path=f'{app.conf.TF_CONF_PATH}/{config}', 
-        workspace='default', logger=task_logger) as w:
-
-        try:
-            rc, stdout, stderr = w.destroy(var=var)
+            w_action = getattr(w, action)
+            rc, stdout, stderr = w_action(var=var)
             return rc, stdout, stderr
         except TerrestrialRetryError as exc:
             raise self.retry(exc=exc, countdown=5)
