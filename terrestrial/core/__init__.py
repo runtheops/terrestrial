@@ -1,1 +1,1 @@
-from .tasks import terraform, list_tasks, get_state, get_result
+from .tasks import terraform, list_celery_tasks, get_task_state, get_task_result

@@ -7,6 +7,21 @@ from terrestrial.errors import TerrestrialFatalError
 from .tfconfig import TerraformConfig
 
 
+KWARGS_MAPPING = {
+    'plan': {
+        'input': False
+    },
+    'apply': {
+        'input': False,
+        'auto_approve': True
+    },
+    'destroy': {
+        'input': False,
+        'auto_approve': True
+    }
+}
+
+
 class TerraformWorker:
     def __init__(self, config_path, workspace, isolate=True, logger=None):
         self.logger = logger or logging.getLogger(__name__)
@@ -17,13 +32,10 @@ class TerraformWorker:
 
     def __getattr__(self, item):
         def wrapper(*args, **kwargs):
-            kwargs.update({
-                'input': False,
-                'no-color': IsFlagged
-            })
+            kwargs.update({'no_color': IsFlagged})
 
-            if item in ['apply', 'destroy']:
-                kwargs.update({'auto_approve': True})
+            if item in KWARGS_MAPPING:
+                kwargs.update(KWARGS_MAPPING[item])
 
             rc, stdout, stderr = self.tf.cmd(
                 item, *args, **kwargs)
@@ -67,6 +79,9 @@ class TerraformWorker:
                 if rc != 0:
                     raise TerrestrialFatalError(
                         f'Failed to set workspace to {self.workspace}')
+
+        self.logger.debug(
+            f'Switched workspace to {self.workspace}')
 
         self._workspace = w
 

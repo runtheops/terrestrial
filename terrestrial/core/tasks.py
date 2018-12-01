@@ -64,14 +64,19 @@ def terraform(self, config, action, var={}, workspace='default'):
 
         try:
             w_action = getattr(w, action)
-            rc, stdout, stderr = w_action(var=var)
+
+            if action in ['plan', 'apply', 'destroy']:
+                rc, stdout, stderr = w_action(var=var)
+            else:
+                rc, stdout, stderr = w_action()
+
             return rc, stdout, stderr
         except TerrestrialRetryError as exc:
             raise self.retry(exc=exc, countdown=5)
 
 
 @app.task()
-def list_tasks(state=None):
+def list_celery_tasks(state=None):
     """
     Queries Celery for tasks of a given state and
     simplifies them down to a plain list of IDs
@@ -113,12 +118,12 @@ def list_tasks(state=None):
 
 
 @app.task(bind=True)
-def get_state(self, task_id):
+def get_task_state(self, task_id):
     task = self.AsyncResult(task_id)
     return task.state
 
 
 @app.task(bind=True)
-def get_result(self, task_id):
+def get_task_result(self, task_id):
     task = self.AsyncResult(task_id)
     return task.result

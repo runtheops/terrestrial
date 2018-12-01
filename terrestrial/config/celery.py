@@ -16,6 +16,6 @@ ONCE = {
   'backend': 'celery_once.backends.Redis',
   'settings': {
     'url': BROKER_URL,
-    'default_timeout': 60
+    'default_timeout': 600
   }
 }

@@ -17,7 +17,7 @@ def list_configurations():
     return body, 200
 
 
-def execute(config, action):
+def execute(config, action, workspace='default'):
     """
     Performs "terraform <action>" on a given <config>
     """
@@ -43,7 +43,8 @@ def execute(config, action):
         f'Passing following variables to Terraform: {var}')
 
     try:
-        task = terraform.apply_async((config, action, var), countdown=delay)
+        task = terraform.apply_async(
+            (config, action, var, workspace), countdown=delay)
     except AlreadyQueued as e:
         body = f'This task is already queued! Cooldown time left: {e}s'
         logger.error(body)

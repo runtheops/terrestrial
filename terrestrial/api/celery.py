@@ -1,7 +1,7 @@
 import logging
 from flask import request
 
-from terrestrial.core import list_tasks, get_state, get_result
+from terrestrial.core import list_celery_tasks, get_task_state, get_task_result
 
 
 logger = logging.getLogger(f'{__name__}.celery')
@@ -18,7 +18,7 @@ def list_tasks(status=None):
 
     logger.debug('Listing tasks')
     try:
-        task = list_tasks.apply((state,))
+        task = list_celery_tasks.apply((state,))
         status = task.get()
     except Exception as e:
         body = f'Failed to list tasks: {e}'
@@ -28,14 +28,14 @@ def list_tasks(status=None):
     return status, 200
 
 
-def get_task_state(task_id):
+def get_state(task_id):
     """
     Retrieve status of a task by its ID
     """
 
     logger.debug(f'Retrieving state of a task {task_id}')
     try:
-        task = get_state.apply((task_id,))
+        task = get_task_state.apply((task_id,))
         status = task.get()
     except Exception as e:
         body = f'Failed to get state of a task "{task_id}": {e}'
@@ -45,14 +45,14 @@ def get_task_state(task_id):
     return status, 200
 
 
-def get_task_result(task_id):
+def get_result(task_id):
     """
     Retrieve result of a task by its ID
     """
 
     logger.debug(f'Retrieving result of task {task_id}')
     try:
-        task = get_result.apply((task_id,))
+        task = get_task_result.apply((task_id,))
         if task.get():
             rc, stdout, stderr = task.get()
         else:
