@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+addr=${TERRESTRIAL_ADDR:-http://localhost:8000}
+api_token=${TERRESTRIAL_TOKEN:-dev}
+
+function usage() {
+    cat <<EOF
+Usage:
+$0 -a <show|plan|apply|destroy> -c <configuration> [optional]
+$0 <misc>
+
+Mandatory
+  -c CONFIGURATION    configuration to work with
+  -a ACTION           action to perform on configuration
+
+Optional:
+  -w WORKSPACE    configuration workspace
+  -v VARIABLES    comma separated list of key=value pairs to pass as variables
+
+Misc:
+  -l    list available configurations
+
+Examples:
+$0 -a plan -c test -v var1=foo,var2=bar
+$0 -a apply -c test -w my-custom-workspace
+EOF
+
+exit 1
+}
+
+function terrestrial() {
+    local action=$1
+    local config=$2
+    local workspace=$3
+    local variables=$4
+
+    body=$(mktemp)
+    curl="curl -sL -w '%{http_code}' -o $body"
+    auth_header="Authorization: Token $api_token"
+
+    if [[ "$action" =~ ^(plan|apply|destroy)$ ]]; then
+        [[ -n $variables ]] && data="-d ${variables//,/&}"
+        http_code=$($curl -XPOST -H "$auth_header" $data $addr/api/v1/configurations/$config/$workspace/$action)
+    elif [[ "$action" =~ ^(show)$ ]]; then
+        http_code=$($curl -H "$auth_header" $addr/api/v1/configurations/$config/$workspace/$action)
+    elif [[ "$action" =~ ^(list)$ ]]; then
+        http_code=$($curl -H "$auth_header" $addr/api/v1/configurations)
+    else
+        echo "Unknown action: \"$action\"!"
+    fi
+
+    if [[ ! $http_code =~ "20:"* ]]; then
+        echo "Failed to perform \"$action\"!"
+    fi
+
+    cat $body && rm $body
+    exit ${status:-1}
+}
+
+[[ -z $* ]] && usage
+while getopts "la:c:w:v:" opt; do
+    case $opt in
+        a)
+            action=$OPTARG
+            ;;
+        c)
+            config=$OPTARG
+            ;;
+        l)
+            action="list"
+            ;;
+        w)
+            workspace=$OPTARG
+            ;;
+        v)
+            variables=$OPTARG
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            exit 1
+            ;;
+        :)
+            echo "Missing option argument for -$OPTARG" >&2
+            exit 1
+            ;;
+        *) 
+            echo "Unimplemented option: -$OPTARG" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "$action" != 'list' ]] && [[ -z $config ]]; then
+    echo "Configuration name is missing."
+    exit 1
+fi
+
+terrestrial ${action:-none} $config ${workspace:-default} $variables
