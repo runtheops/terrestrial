@@ -61,12 +61,12 @@ class TerraformWorker:
         return self._workspace
 
     @workspace.setter
-    def workspace(self, w):    
+    def workspace(self, w):
         expr = re.compile('^[a-z0-9\-_.~]{1,255}$', re.IGNORECASE)
 
         if not re.match(expr, w):
             raise TerrestrialFatalError(
-                'Workspace name must contain only URL safe characters.')    
+                'Workspace name must contain only URL safe characters.')
 
         rc, stdout, stderr = self.tf.cmd(
             'workspace', 'new', w, '-no-color')

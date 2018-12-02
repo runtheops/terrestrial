@@ -15,7 +15,7 @@ class TerraformConfig:
         self.name = Path(path).stem
 
         self._clone_path = None
- 
+
     @property
     def path(self):
         return self._path

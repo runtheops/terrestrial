@@ -21,8 +21,8 @@ def execute(config, action, workspace='default'):
     """
     Performs "terraform <action>" on a given <config>
     """
-    async = True if 'async' in request.args else False
-    if async:
+    apply_async = True if 'async' in request.args else False
+    if apply_async:
         logger.debug(f'Performing {action} asynchronously')
 
     delay = 0
@@ -36,8 +36,8 @@ def execute(config, action, workspace='default'):
         logger.debug(f'Performing terraform {action} with {delay}s delay')
 
     var = dict(zip(
-        [ k for k in request.form ],
-        [ request.form[k] for k in request.form ]))
+        [k for k in request.form],
+        [request.form[k] for k in request.form]))
 
     logger.debug(
         f'Passing following variables to Terraform: {var}')
@@ -54,7 +54,7 @@ def execute(config, action, workspace='default'):
         logger.error(body)
         return body, 500
 
-    if async:
+    if apply_async:
         return task.id, 201
 
     logger.debug(f'Waiting for task {task.id} to finish')

@@ -21,7 +21,7 @@ task_logger = get_task_logger(__name__)
 @worker_ready.connect
 def init(*args, **kwargs):
     """
-    Initializes all Terraform configurations 
+    Initializes all Terraform configurations
     found under configurations path
     """
 
@@ -100,7 +100,7 @@ def list_celery_tasks(state=None):
         logger.debug(f'Listing tasks of a worker "{worker}"')
 
         if tasks[worker]:
-            w_tasks = [ t['request']['id'] for t in tasks[worker] ]
+            w_tasks = [t['request']['id'] for t in tasks[worker]]
 
         parsed.update(w_tasks)
 
