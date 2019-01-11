@@ -2,6 +2,9 @@
 
 addr=${TERRESTRIAL_ADDR:-http://localhost:8000}
 api_token=${TERRESTRIAL_TOKEN:-dev}
+auth_header="Authorization: Token $api_token"
+wait_delay=30
+wait_max=1800
 
 function usage() {
     cat <<EOF
@@ -18,7 +21,10 @@ Optional:
   -v VARIABLES    comma separated list of key=value pairs to pass as variables
 
 Misc:
-  -l    list available configurations
+  -l           list available configurations
+  -n           perform action asynchronously
+  -d DELAY     delays task execution for N seconds
+  -t TASK_ID   track task execution by ID, output result when ready
 
 Examples:
 $0 -a plan -c test -v var1=foo,var2=bar
@@ -28,37 +34,92 @@ EOF
 exit 1
 }
 
-function terrestrial() {
-    local action=$1
-    local config=$2
-    local workspace=$3
-    local variables=$4
+function log() {
+  dt=$(date '+%Y-%m-%d %H:%M:%S')
+  message="$1"
+  severity=${2:-INFO}
+  echo "[$dt] $severity: $message" >&2
+}
 
-    body=$(mktemp)
-    curl="curl -sL -w '%{http_code}' -o $body"
-    auth_header="Authorization: Token $api_token"
+function exit_error() {
+  log "$1" "ERROR" >&2
+  exit "${2:-1}"
+}
+
+function terrestrial() {
+    local workspace=${workspace:-"default"}
+    local delay=${delay:-0}
+
+    local body=$(mktemp)
+    local curl="curl -sL -w '%{http_code}' -o $body"
+
+    args="?delay=$delay"
+    if [[ "$async" == "true" ]]; then
+        args="$args&async"
+    fi
 
     if [[ "$action" =~ ^(plan|apply|destroy)$ ]]; then
         [[ -n $variables ]] && data="-d ${variables//,/&}"
-        http_code=$($curl -XPOST -H "$auth_header" $data $addr/api/v1/configurations/$config/$workspace/$action)
+        http_code=$($curl -H "$auth_header" -XPOST $data $addr/api/v1/configurations/$config/$workspace/${action}${args})
     elif [[ "$action" =~ ^(show)$ ]]; then
         http_code=$($curl -H "$auth_header" $addr/api/v1/configurations/$config/$workspace/$action)
     elif [[ "$action" =~ ^(list)$ ]]; then
         http_code=$($curl -H "$auth_header" $addr/api/v1/configurations)
     else
-        echo "Unknown action: \"$action\"!"
+        exit_error "Unknown action: \"$action\"!"
     fi
 
-    if [[ ! $http_code =~ "20:"* ]]; then
-        echo "Failed to perform \"$action\"!"
+    if [[ ! "$http_code" =~ "20:"* ]]; then
+        exit_error "Failed to perform \"$action\". $(cat $body)"
     fi
 
-    cat $body && rm $body
-    exit ${status:-1}
+    cat $body && rm -f $body
+    exit 0
+}
+
+function track() {
+    local body=$(mktemp)
+    local curl="curl -sL -w '%{http_code}' -o $body"
+
+    start=$(date +%s)
+    current=start
+    while [[ $((current-start)) -lt $wait_max ]]; do
+        http_code=$($curl -H "$auth_header" $addr/api/v1/tasks/$task_id)
+
+        if [[ "$http_code" == "404" ]]; then
+            exit_error "No task found for ID \"$task_id\""
+        elif [[ ! "$http_code" =~ "20:"* ]]; then
+            exit_error "Failed to obtain task status!"
+        else
+            task_status=$(cat $body)
+            if [[ "$task_status" == "PENDING" ]]; then
+                log "Task is pending execution."
+                sleep $wait_delay
+            elif [[ "$task_status" == "STARTED" ]]; then
+                log "Task execution is in progress."
+                sleep $wait_delay
+            elif [[ "$task_status" == "SUCCESS" ]]; then
+                log "Obtaining task result."
+                http_code=$($curl -H "$auth_header" $addr/api/v1/tasks/$task_id/result)
+                rc=$?
+
+                if [[ ! $http_code =~ "20:"* ]]; then
+                    log "Failed to obtain task result, or task is erring!" "ERROR"
+                fi
+
+                cat $body && rm -f $body
+                exit ${rc:-1}
+            else
+                exit_error "Unknown task status: \"$task_status\"!"
+            fi
+        fi
+
+        current=$(date +%s)
+    done
 }
 
 [[ -z $* ]] && usage
-while getopts "la:c:w:v:" opt; do
+while getopts "lnd:t:a:c:w:v:" opt; do
     case $opt in
         a)
             action=$OPTARG
@@ -66,14 +127,23 @@ while getopts "la:c:w:v:" opt; do
         c)
             config=$OPTARG
             ;;
-        l)
-            action="list"
-            ;;
         w)
             workspace=$OPTARG
             ;;
         v)
             variables=$OPTARG
+            ;;
+        l)
+            action="list"
+            ;;
+        n)
+            async="true"
+            ;;
+        d)
+            delay=$OPTARG
+            ;;
+        t)
+            task_id=$OPTARG
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
@@ -83,16 +153,21 @@ while getopts "la:c:w:v:" opt; do
             echo "Missing option argument for -$OPTARG" >&2
             exit 1
             ;;
-        *) 
+        *)
             echo "Unimplemented option: -$OPTARG" >&2
             exit 1
             ;;
     esac
 done
 
-if [[ "$action" != 'list' ]] && [[ -z $config ]]; then
-    echo "Configuration name is missing."
-    exit 1
+if [[ "$action" == "list" ]]; then
+    terrestrial
+elif [[ -n "$action" ]] && [[ -n $config ]]; then
+    terrestrial
+elif [[ -n "$action" ]] && [[ -z $config ]]; then
+    exit_error "Configuration name is missing."
+elif [[ -z "$action" ]] && [[ -n "$task_id" ]]; then
+    track
+else
+    usage
 fi
-
-terrestrial ${action:-none} $config ${workspace:-default} $variables
