@@ -4,5 +4,5 @@ Flask==1.0.2
 Flask-HTTPAuth==3.2.4
 Flask-RESTful==0.3.6
 python-terraform==0.10.0
-redis==2.10.6
+redis>=3.2.0
 gunicorn==19.9.0
