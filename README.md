@@ -1,25 +1,12 @@
 # Terrestrial
 Celery-backed REST API around Terraform.
 
-**Not battle tested yet!**
-
-## Why?
-
-Imagine getting a request from a team, like: "we want to be able to quickly deploy a fully configured environment, end to end, with this version of this app, and that version of that app... and it should be running on top of a fresh DB snapshot from that other environment. Oh, and we want to do that as a part of CI on every PR. And also from a Slack chat. And this env should really just kill itself after a while if we forget to drop it manually."
-
-Other portion of input data: I tend to have every piece of infrastructure implemented as a code (usually) with Terraform.
-
-That's pretty much the background of what Terrestrial aims to solve for me and how it's shaped.
-
-Also, automation if fun.
-
-## How?
-
-Terrestrial wraps Terraform, exposing a set of API endpoints, which, being triggered, perform Terraform actions as if you do them manually.
+## What?
+Terrestrial wraps Terraform, exposing a set of API endpoints, which, being triggered, perform Terraform actions as if you did them manually.
 
 Now, since Terraform apply/destroy and even plan can take quite a while, you would want to schedule the whole run as some kind of a background job, and not wait for the API call to finish. Hence Celery.
 
-It should also work with hosted CI systems (Travis/CircleCI, name it), and at the same time be capable of provisioning things which are often only accessible from inside the infrastructure (like, create a user and a database in DBMS, which resides in a private network), which Terraform conveniently has providers for. Hence, not having it all implemented as a set of CI jobs.
+It was created to work with hosted CI systems (Travis/CircleCI, name it), and at the same time be capable of provisioning things which are often only accessible from inside the infrastructure (like, create a user and a database in DBMS, which resides in a private VPC), which Terraform conveniently has providers for. It is also meant to serve as an IaaC automation trigger for chatbots. Hence, not having it all implemented as a set of CI jobs.
 
 ## Requirements
 * Python 3.6
@@ -72,7 +59,9 @@ TF_CONF_PATH=<path to Terraform configurations directory> # defaults to "configu
 ```
 
 ## API
-Terrestrial comes with a simple bash client, located under `cli` folder, which does most of the following in a more convenient way.
+Terrestrial comes with a simple bash client, located under `cli` folder, which does most of the following in a more convenient way. Just export `TERRESTRIAL_ADDR` and `TERRESTRIAL_TOKEN` and use that bash CLI.
+
+Following is a detailed set of curl-based copy-paste friendly examples:
 
 Assuming API is accessible at
 ```bash
